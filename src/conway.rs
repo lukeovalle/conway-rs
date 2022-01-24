@@ -79,7 +79,7 @@ impl Conway {
         Ok(())
     }
 
-    pub fn nacer_célula(&mut self, x: usize, y: usize) -> Result<(), Error> {
+    pub fn crear_célula(&mut self, x: usize, y: usize) -> Result<(), Error> {
         if x >= self.ancho() || y >= self.alto() {
             return Err(Error::Desbordado);
         }
@@ -101,18 +101,34 @@ impl Conway {
                 || (i == 0 && j == 0) {
                     continue;
                 }
-//                dbg!(self.ancho());
-//                dbg!(x);
-//                dbg!(i);
-//                dbg!(self.alto());
-//                dbg!(y);
-//                dbg!(j);
 
                 vecinos.push(self.mapa[(x as i32 + i) as usize][(y as i32 + j) as usize]);
             }
         }
 
         CélulaIter::new(vecinos)
+    }
+
+    pub fn iterar_mapa(&mut self) -> Result<(), anyhow::Error> {
+        let mut nuevo = Conway::new(self.ancho(), self.alto(), false);
+
+        for i in 0..self.ancho() {
+            for j in 0..self.alto() {
+                let vecinas = self.recorrer_vecinas(i, j).filter(|c| *c).count();
+
+                if self.ver_célula(i,j).unwrap() == false && vecinas == 3 {
+                    nuevo.crear_célula(i, j)?;
+                } else if self.ver_célula(i, j).unwrap() && (vecinas == 2 || vecinas == 3) {
+                    nuevo.crear_célula(i, j)?;
+                } else {
+                    nuevo.matar_célula(i, j)?;
+                }
+            }
+        }
+
+        *self = nuevo;
+        
+        Ok(())
     }
 }
 

@@ -3,6 +3,7 @@ mod conway;
 use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
+use sdl2::mouse::MouseButton;
 use sdl2::rect::Rect;
 use std::time::{Duration, Instant};
 use anyhow::anyhow;
@@ -28,24 +29,32 @@ fn main() {
     'game: loop {
         let ahora = Instant::now();
 
-        match procesar_entrada(&mut event_pump) {
+        match procesar_entrada(&mut event_pump, &canvas, &mapa) {
             Some(Acción::Salir) => {
                 break 'game
             }
             Some(Acción::Pausa) => {
                 pausa = !pausa;
             }
+            Some(Acción::CrearCélula { x, y }) => {
+                if let Err(_) = mapa.crear_célula(x, y) {
+                    break 'game
+                }
+            }
+            Some(Acción::MatarCélula { x, y }) => {
+                if let Err(_) = mapa.matar_célula(x, y) {
+                    break 'game
+                }
+            }
             None => {}
         }
 
-        match iterar_juego(&mut mapa, pausa) {
-            Ok(_) => {},
-            Err(_) => { break 'game;}
+        if let Err(_) = iterar_juego(&mut mapa, pausa) {
+            break 'game;
         }
 
-        match pintar_mapa(&mut canvas, &mapa) {
-            Ok(_) => {},
-            Err(_) => { break 'game;}
+        if let Err(_) = pintar_mapa(&mut canvas, &mapa) {
+            break 'game;
         }
 
         let dormir = Duration::new(0, 1_000_000_000u32 / 3).saturating_sub(ahora.elapsed());
@@ -53,7 +62,18 @@ fn main() {
     }
 }
 
-fn procesar_entrada(event_pump: &mut sdl2::EventPump) -> Option<Acción> {
+fn procesar_entrada(
+    event_pump: &mut sdl2::EventPump,
+    canvas: &sdl2::render::Canvas<sdl2::video::Window>,
+    mapa: &conway::Conway
+) -> Option<Acción> {
+    let ancho_ventana = canvas.window().drawable_size().0 as usize;
+    let alto_ventana = canvas.window().drawable_size().1 as usize;
+    let filas = mapa.alto();
+    let columnas = mapa.ancho();
+    let ancho = ancho_ventana / columnas;
+    let alto = alto_ventana / filas;
+ 
     for event in event_pump.poll_iter() {
         match event {
             Event::Quit { .. } |
@@ -63,6 +83,18 @@ fn procesar_entrada(event_pump: &mut sdl2::EventPump) -> Option<Acción> {
             Event::KeyDown { keycode: Some(Keycode::P), .. } => {
                 return Some(Acción::Pausa)
             }
+            Event::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => {
+                return Some(Acción::CrearCélula {
+                    x: x as usize / ancho,
+                    y: y as usize / alto
+                })
+            }
+            Event::MouseButtonDown { mouse_btn: MouseButton::Right, x, y, .. } => {
+                return Some(Acción::MatarCélula {
+                    x: x as usize / ancho,
+                    y: y as usize / alto
+                })
+            }
             _ => {}
         }
     }
@@ -70,25 +102,11 @@ fn procesar_entrada(event_pump: &mut sdl2::EventPump) -> Option<Acción> {
 }
 
 fn iterar_juego(mapa: &mut conway::Conway, pausa: bool) -> Result<(), anyhow::Error> {
-    if pausa { return Ok(()); }
 
-    let mut nuevo = conway::Conway::new(mapa.ancho(), mapa.alto(), false);
 
-    for i in 0..mapa.ancho() {
-        for j in 0..mapa.alto() {
-            let vecinas = mapa.recorrer_vecinas(i, j).filter(|c| *c).count();
-
-            if mapa.ver_célula(i,j).unwrap() == false && vecinas == 3 {
-                nuevo.nacer_célula(i, j)?;
-            } else if mapa.ver_célula(i, j).unwrap() && (vecinas == 2 || vecinas == 3) {
-                nuevo.nacer_célula(i, j)?;
-            } else {
-                nuevo.matar_célula(i, j)?;
-            }
-        }
+    if !pausa {
+        return mapa.iterar_mapa();
     }
-    
-    *mapa = nuevo;
 
     Ok(())
 }
@@ -96,7 +114,7 @@ fn iterar_juego(mapa: &mut conway::Conway, pausa: bool) -> Result<(), anyhow::Er
 fn pintar_mapa(
     canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
     mapa: &conway::Conway
-    ) -> Result<(), anyhow::Error> {
+) -> Result<(), anyhow::Error> {
 
     canvas.set_draw_color(Color::RGB(10, 70, 10));
     canvas.clear();
@@ -107,13 +125,6 @@ fn pintar_mapa(
     let columnas = mapa.ancho() as i32;
     let ancho = ancho_ventana / columnas;
     let alto = alto_ventana / filas;
-
-//    dbg!(ancho_ventana);
-//    dbg!(alto_ventana);
-//    dbg!(filas);
-//    dbg!(columnas);
-//    dbg!(ancho);
-//    dbg!(alto);
 
     // rejilla
     canvas.set_draw_color(Color::RGB(0, 0, 0));
@@ -156,5 +167,7 @@ fn pintar_mapa(
 
 enum Acción {
     Salir,
-    Pausa
+    Pausa,
+    CrearCélula { x: usize, y: usize },
+    MatarCélula { x: usize, y: usize }
 }

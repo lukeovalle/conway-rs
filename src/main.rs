@@ -1,8 +1,11 @@
+mod conway;
+
 use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use anyhow::anyhow;
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -16,33 +19,49 @@ fn main() {
 
     let mut canvas = window.into_canvas().build().unwrap();
 
-    let mut mapa = conway::Conway::new(5, 10, true);
-
+    let mut mapa = conway::Conway::new(40, 40, true);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
 
+    let mut pausa = false;
+
     'game: loop {
-        match procesar_entrada(&mut event_pump, &mut mapa) {
-            Some(_) => {
+        let ahora = Instant::now();
+
+        match procesar_entrada(&mut event_pump) {
+            Some(Acción::Salir) => {
                 break 'game
+            }
+            Some(Acción::Pausa) => {
+                pausa = !pausa;
             }
             None => {}
         }
 
-        iterar_juego(&mut mapa);
+        match iterar_juego(&mut mapa, pausa) {
+            Ok(_) => {},
+            Err(_) => { break 'game;}
+        }
 
-        pintar_mapa(&mut canvas, &mapa);
+        match pintar_mapa(&mut canvas, &mapa) {
+            Ok(_) => {},
+            Err(_) => { break 'game;}
+        }
 
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+        let dormir = Duration::new(0, 1_000_000_000u32 / 3).saturating_sub(ahora.elapsed());
+        ::std::thread::sleep(dormir);
     }
 }
 
-fn procesar_entrada(event_pump: &mut sdl2::EventPump, mapa: &mut conway::Conway) -> Option<String> {
+fn procesar_entrada(event_pump: &mut sdl2::EventPump) -> Option<Acción> {
     for event in event_pump.poll_iter() {
         match event {
             Event::Quit { .. } |
             Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                return Some("Saliendo".to_string())
+                return Some(Acción::Salir)
+            }
+            Event::KeyDown { keycode: Some(Keycode::P), .. } => {
+                return Some(Acción::Pausa)
             }
             _ => {}
         }
@@ -50,69 +69,92 @@ fn procesar_entrada(event_pump: &mut sdl2::EventPump, mapa: &mut conway::Conway)
     None
 }
 
-fn iterar_juego(mapa: &mut conway::Conway) {
+fn iterar_juego(mapa: &mut conway::Conway, pausa: bool) -> Result<(), anyhow::Error> {
+    if pausa { return Ok(()); }
 
+    let mut nuevo = conway::Conway::new(mapa.ancho(), mapa.alto(), false);
+
+    for i in 0..mapa.ancho() {
+        for j in 0..mapa.alto() {
+            let vecinas = mapa.recorrer_vecinas(i, j).filter(|c| *c).count();
+
+            if mapa.ver_célula(i,j).unwrap() == false && vecinas == 3 {
+                nuevo.nacer_célula(i, j)?;
+            } else if mapa.ver_célula(i, j).unwrap() && (vecinas == 2 || vecinas == 3) {
+                nuevo.nacer_célula(i, j)?;
+            } else {
+                nuevo.matar_célula(i, j)?;
+            }
+        }
+    }
+    
+    *mapa = nuevo;
+
+    Ok(())
 }
 
-fn pintar_mapa(canvas: &mut sdl2::render::Canvas<sdl2::video::Window>, mapa: &conway::Conway) {
-    canvas.set_draw_color(Color::RGB(10, 90, 10));
+fn pintar_mapa(
+    canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
+    mapa: &conway::Conway
+    ) -> Result<(), anyhow::Error> {
+
+    canvas.set_draw_color(Color::RGB(10, 70, 10));
     canvas.clear();
-    canvas.set_draw_color(Color::RGB(255, 255, 255));
 
     let ancho_ventana = canvas.window().drawable_size().0 as i32;
     let alto_ventana = canvas.window().drawable_size().1 as i32;
-    let filas = mapa.ancho() as i32;
-    let columnas = mapa.alto() as i32;
+    let filas = mapa.alto() as i32;
+    let columnas = mapa.ancho() as i32;
     let ancho = ancho_ventana / columnas;
     let alto = alto_ventana / filas;
-    
+
+//    dbg!(ancho_ventana);
+//    dbg!(alto_ventana);
+//    dbg!(filas);
+//    dbg!(columnas);
+//    dbg!(ancho);
+//    dbg!(alto);
 
     // rejilla
-    for i in 1..(mapa.len()) {
-        let st = canvas.draw_line(
-            (0 as i32, alto_ventana / filas * i as i32),
-            (ancho_ventana as i32, alto_ventana / filas * i as i32)
-            );
+    canvas.set_draw_color(Color::RGB(0, 0, 0));
 
-        match st {
-            Err(txt) => { println!("{}", txt); },
-            _ => {}
-        }
+    for i in 1..columnas {
+        canvas.draw_line(
+            (ancho * i as i32, 0),
+            (ancho * i as i32, alto_ventana)
+        ).map_err(|e| anyhow!(e))?;
     }
-    for i in 1..(mapa.first().unwrap().len()) {
-        let st = canvas.draw_line(
-            (ancho_ventana / columnas * i as i32, 0 as i32),
-            (ancho_ventana / columnas * i as i32, alto_ventana as i32)
-            );
-
-        match st {
-            Err(txt) => { println!("{}", txt); },
-            _ => {}
-        }
+    for i in 1..filas {
+        canvas.draw_line(
+            (0, alto * i as i32),
+            (ancho_ventana, alto * i as i32)
+        ).map_err(|e| anyhow!(e))?;
     }
 
     // dibujo rectángulos
-    for i in 0..(mapa.len()) {
-        for j in 0..(mapa.first().unwrap().len()) {
-            if mapa[i][j] == false { continue; };
+    canvas.set_draw_color(Color::RGB(10, 180, 10));
+    for i in 0..columnas {
+        for j in 0..filas {
+            if mapa.ver_célula(i as usize, j as usize).unwrap() == false { continue; };
 
-            let st = canvas.fill_rect(
+            canvas.fill_rect(
                 Rect::new(
                     ancho_ventana / columnas * i as i32,
                     alto_ventana / filas * j as i32,
                     ancho as u32,
                     alto as u32
-                    )
-                );
-
-            match st {
-                Err(txt) => { println!("{}", txt); },
-                _ => {}
-            }
+                )
+            ).map_err(|e| anyhow!(e))?;
         }
     }
 
 
-    canvas.present()
+    canvas.present();
+
+    Ok(())
 }
 
+enum Acción {
+    Salir,
+    Pausa
+}

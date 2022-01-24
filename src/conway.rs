@@ -1,44 +1,118 @@
-pub struct Conway {
-    mapa: Vec<Vec<bool>>; // arreglo (columna) de filas de bool
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("desbordó de la matriz")]
+    Desbordado
 }
 
-struct CélulaIter<'a, It> {
-    vecinos: &'a [bool]
+pub struct CélulaIter {
+    vecinos: Vec<bool>,
+    actual: usize
 }
+
+impl CélulaIter {
+    fn new(vecinos: Vec<bool>) -> CélulaIter {
+        CélulaIter { vecinos, actual: 0 }
+    }
+}
+
+impl Iterator for CélulaIter {
+    type Item = bool;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let valor = if self.actual < self.vecinos.len() {
+            Some(self.vecinos[self.actual])
+        } else {
+            None
+        };
+
+        self.actual += 1;
+
+        valor
+    }
+}
+
+pub struct Conway {
+    mapa: Vec<Vec<bool>> // arreglo (fila) de columnas de bool
+}
+
 
 impl Conway {
     pub fn new(ancho: usize, alto: usize, aleatorio: bool) -> Conway {
-        let mapa: Vec<Vec<bool>> = Vec::with_capacity(alto);
+        let mut mapa: Vec<Vec<bool>> = Vec::with_capacity(ancho);
 
-        for i in 0..alto {
-            mapa.push(Vec::with_capacity(ancho));
+        for i in 0..ancho {
+            mapa.push(Vec::with_capacity(alto));
 
-            for j in 0..ancho {
-                mapa.last().unwrap().push(if aleatorio { rand::random() } else { false });
+            for _j in 0..alto {
+                mapa[i].push(if aleatorio { rand::random() } else { false });
             }
         }
 
         Conway { mapa }
     }
 
-    pub fn alto() -> usize {
-        mapa.len()
+    pub fn ancho(&self) -> usize {
+        self.mapa.len()
     }
 
-    pub fn ancho() -> usize {
-        mapa.first().unwrap().len()
+    pub fn alto(&self) -> usize {
+        self.mapa.first().unwrap().len()
     }
 
-    pub fn matar_célula(x, y) {
-        mapa[x][y] = false;
+    pub fn ver_célula(&self, x: usize, y: usize) -> Result<bool, Error> {
+        if x >= self.ancho() || y >= self.alto() {
+            Err(Error::Desbordado)
+        } else {
+            Ok(self.mapa[x][y])
+        }
     }
 
-    pub fn nacer_célula(x, y) {
-        mapa[x][y] = true;
+    pub fn matar_célula(&mut self, x: usize, y: usize) -> Result<(), Error> {
+        if x >= self.ancho() || y >= self.alto() {
+            return Err(Error::Desbordado);
+        }
+
+        self.mapa[x][y] = false;
+
+        Ok(())
     }
 
-    pub fn recorrer_vecinas(x, y) -> std::iter::Iterator<Item=bool> {
+    pub fn nacer_célula(&mut self, x: usize, y: usize) -> Result<(), Error> {
+        if x >= self.ancho() || y >= self.alto() {
+            return Err(Error::Desbordado);
+        }
+
+        self.mapa[x][y] = true;
+
+        Ok(())
+    }
+
+    pub fn recorrer_vecinas(&self, x: usize, y: usize) -> CélulaIter {
+        let mut vecinos = Vec::with_capacity(8);
+
+        for i in (-1 as i32)..=1 {
+            for j in (-1 as i32)..=1 {
+                if x as i32 + i < 0
+                || x as i32 + i >= self.ancho() as i32
+                || y as i32 + j < 0
+                || y as i32 + j >= self.alto() as i32
+                || (i == 0 && j == 0) {
+                    continue;
+                }
+//                dbg!(self.ancho());
+//                dbg!(x);
+//                dbg!(i);
+//                dbg!(self.alto());
+//                dbg!(y);
+//                dbg!(j);
+
+                vecinos.push(self.mapa[(x as i32 + i) as usize][(y as i32 + j) as usize]);
+            }
+        }
+
+        CélulaIter::new(vecinos)
     }
 }
-
 

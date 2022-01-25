@@ -42,13 +42,13 @@ fn main() {
                 pausa = !pausa;
             }
             Some(Acción::CrearCélula { x, y }) => {
-                if let Err(_) = mapa.crear_célula(x, y) {
-                    break 'game
+                if let Err(e) = mapa.crear_célula(x, y) {
+                    println!("{}", e);
                 }
             }
             Some(Acción::MatarCélula { x, y }) => {
-                if let Err(_) = mapa.matar_célula(x, y) {
-                    break 'game
+                if let Err(e) = mapa.matar_célula(x, y) {
+                    println!("{}", e);
                 }
             }
             Some(Acción::LimpiarMapa) => {
@@ -61,7 +61,8 @@ fn main() {
         }
 
         while tiempo_que_pasó >= tiempo_por_tick {
-            if let Err(_) = iterar_juego(&mut mapa, pausa) {
+            if let Err(e) = iterar_juego(&mut mapa, pausa) {
+                dbg!(e);
                 break 'game;
             }
             tiempo_que_pasó -= tiempo_por_tick;

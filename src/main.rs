@@ -24,6 +24,11 @@ fn main() {
 
     let mut event_pump = sdl_context.event_pump().unwrap();
 
+    // Quiero que vaya a 60fps pero haga 3 iteraciones por segundo
+    let tiempo_por_frame = Duration::from_nanos(1_000_000_000u64 / 60);
+    let tiempo_por_tick = Duration::from_nanos(1_000_000_000u64 / 3);
+
+    let mut tiempo_que_pasó = Duration::ZERO;
     let mut pausa = false;
 
     'game: loop {
@@ -46,19 +51,28 @@ fn main() {
                     break 'game
                 }
             }
+            Some(Acción::LimpiarMapa) => {
+                mapa = conway::Conway::new(mapa.ancho(), mapa.alto(), false)
+            }
+            Some(Acción::AleatorizarMapa) => {
+                mapa = conway::Conway::new(mapa.ancho(), mapa.alto(), true)
+            }
             None => {}
         }
 
-        if let Err(_) = iterar_juego(&mut mapa, pausa) {
-            break 'game;
+        while tiempo_que_pasó >= tiempo_por_tick {
+            if let Err(_) = iterar_juego(&mut mapa, pausa) {
+                break 'game;
+            }
+            tiempo_que_pasó -= tiempo_por_tick;
         }
 
         if let Err(_) = pintar_mapa(&mut canvas, &mapa) {
             break 'game;
         }
 
-        let dormir = Duration::new(0, 1_000_000_000u32 / 3).saturating_sub(ahora.elapsed());
-        ::std::thread::sleep(dormir);
+        ::std::thread::sleep(tiempo_por_frame.saturating_sub(ahora.elapsed()));
+        tiempo_que_pasó += ahora.elapsed();
     }
 }
 
@@ -82,6 +96,12 @@ fn procesar_entrada(
             }
             Event::KeyDown { keycode: Some(Keycode::P), .. } => {
                 return Some(Acción::Pausa)
+            }
+            Event::KeyDown { keycode: Some(Keycode::C), .. } => {
+                return Some(Acción::LimpiarMapa)
+            }
+            Event::KeyDown { keycode: Some(Keycode::R), .. } => {
+                return Some(Acción::AleatorizarMapa)
             }
             Event::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => {
                 return Some(Acción::CrearCélula {
@@ -169,5 +189,7 @@ enum Acción {
     Salir,
     Pausa,
     CrearCélula { x: usize, y: usize },
-    MatarCélula { x: usize, y: usize }
+    MatarCélula { x: usize, y: usize },
+    LimpiarMapa,
+    AleatorizarMapa
 }

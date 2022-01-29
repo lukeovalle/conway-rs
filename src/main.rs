@@ -20,7 +20,8 @@ fn main() {
 
     let mut canvas = window.into_canvas().build().unwrap();
 
-    let mut mapa = conway::Conway::new(40, 40, true);
+    let mut mapa = conway::Conway::new(40, 40);
+    mapa.aleatorizar();
 
     let mut event_pump = sdl_context.event_pump().unwrap();
 
@@ -36,7 +37,7 @@ fn main() {
 
         match procesar_entrada(&mut event_pump, &canvas, &mapa) {
             Some(Acción::Salir) => {
-                break 'game
+                break 'game;
             }
             Some(Acción::Pausa) => {
                 pausa = !pausa;
@@ -52,10 +53,10 @@ fn main() {
                 }
             }
             Some(Acción::LimpiarMapa) => {
-                mapa = conway::Conway::new(mapa.ancho(), mapa.alto(), false)
+                mapa.limpiar();
             }
             Some(Acción::AleatorizarMapa) => {
-                mapa = conway::Conway::new(mapa.ancho(), mapa.alto(), true)
+                mapa.aleatorizar();
             }
             None => {}
         }

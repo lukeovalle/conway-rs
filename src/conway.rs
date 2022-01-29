@@ -34,23 +34,25 @@ impl Iterator for CélulaIter {
 }
 
 pub struct Conway {
-    mapa: Vec<Vec<bool>> // arreglo (fila) de columnas de bool
+    mapa: Vec<Vec<bool>>, // arreglo (fila) de columnas de bool
+    siguiente: Vec<Vec<bool>> // siguiente iteración del mapa
 }
 
 
 impl Conway {
-    pub fn new(ancho: usize, alto: usize, aleatorio: bool) -> Conway {
+    pub fn new(ancho: usize, alto: usize) -> Conway {
         let mut mapa: Vec<Vec<bool>> = Vec::with_capacity(ancho);
 
         for i in 0..ancho {
             mapa.push(Vec::with_capacity(alto));
 
             for _j in 0..alto {
-                mapa[i].push(if aleatorio { rand::random() } else { false });
+                mapa[i].push(false);
             }
         }
+        let siguiente = mapa.clone();
 
-        Conway { mapa }
+        Conway { mapa, siguiente }
     }
 
     pub fn ancho(&self) -> usize {
@@ -59,6 +61,22 @@ impl Conway {
 
     pub fn alto(&self) -> usize {
         self.mapa.first().unwrap().len()
+    }
+
+    pub fn limpiar(&mut self) {
+        for i in 0..self.ancho() {
+            for j in 0..self.alto() {
+                self.mapa[i][j] = false;
+            }
+        }
+    }
+
+    pub fn aleatorizar(&mut self) {
+        for i in 0..self.ancho() {
+            for j in 0..self.alto() {
+                self.mapa[i][j] = rand::random();
+            }
+        }
     }
 
     pub fn ver_célula(&self, x: usize, y: usize) -> Result<bool, Error> {
@@ -110,23 +128,20 @@ impl Conway {
     }
 
     pub fn iterar_mapa(&mut self) -> Result<(), anyhow::Error> {
-        let mut nuevo = Conway::new(self.ancho(), self.alto(), false);
-
         for i in 0..self.ancho() {
             for j in 0..self.alto() {
                 let vecinas = self.recorrer_vecinas(i, j).filter(|c| *c).count();
 
                 if self.ver_célula(i,j).unwrap() == false && vecinas == 3 {
-                    nuevo.crear_célula(i, j)?;
+                    self.siguiente[i][j] = true;
                 } else if self.ver_célula(i, j).unwrap() && (vecinas == 2 || vecinas == 3) {
-                    nuevo.crear_célula(i, j)?;
+                    self.siguiente[i][j] = true;
                 } else {
-                    nuevo.matar_célula(i, j)?;
+                    self.siguiente[i][j] = false;
                 }
             }
         }
-
-        *self = nuevo;
+        std::mem::swap(&mut self.mapa, &mut self.siguiente);
         
         Ok(())
     }

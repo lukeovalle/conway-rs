@@ -69,7 +69,7 @@ fn main() {
             tiempo_que_pasó -= tiempo_por_tick;
         }
 
-        if let Err(_) = pintar_mapa(&mut canvas, &mapa) {
+        if pintar_mapa(&mut canvas, &mapa).is_err() {
             break 'game;
         }
 
@@ -168,7 +168,7 @@ fn pintar_mapa(
     canvas.set_draw_color(Color::RGB(10, 180, 10));
     for i in 0..columnas {
         for j in 0..filas {
-            if mapa.ver_célula(i as usize, j as usize).unwrap() == false { continue; };
+            if !mapa.ver_célula(i as usize, j as usize).unwrap() { continue; };
 
             canvas.fill_rect(
                 Rect::new(

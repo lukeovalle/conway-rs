@@ -110,8 +110,8 @@ impl Conway {
     pub fn recorrer_vecinas(&self, x: usize, y: usize) -> CélulaIter {
         let mut vecinos = Vec::with_capacity(8);
 
-        for i in (-1 as i32)..=1 {
-            for j in (-1 as i32)..=1 {
+        for i in -1..=1 {
+            for j in -1..=1 {
                 if x as i32 + i < 0
                 || x as i32 + i >= self.ancho() as i32
                 || y as i32 + j < 0
@@ -132,9 +132,7 @@ impl Conway {
             for j in 0..self.alto() {
                 let vecinas = self.recorrer_vecinas(i, j).filter(|c| *c).count();
 
-                if self.ver_célula(i,j).unwrap() == false && vecinas == 3 {
-                    self.siguiente[i][j] = true;
-                } else if self.ver_célula(i, j).unwrap() && (vecinas == 2 || vecinas == 3) {
+                if self.ver_célula(i, j).unwrap() && (vecinas == 2 || vecinas == 3) {
                     self.siguiente[i][j] = true;
                 } else {
                     self.siguiente[i][j] = false;
@@ -147,3 +145,38 @@ impl Conway {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ancho() {
+        let mapa = Conway::new(5, 10);
+
+        assert_eq!(mapa.ancho(), 5);
+    }
+
+    #[test]
+    fn test_alto() {
+        let mapa = Conway::new(5, 10);
+
+        assert_eq!(mapa.alto(), 10);
+    }
+
+    #[test]
+    fn test_limpiar() -> Result<(), anyhow::Error> {
+        let mut mapa = Conway::new(5, 10);
+        mapa.aleatorizar();
+
+        mapa.limpiar();
+
+        for i in 0..mapa.ancho() {
+            for j in 0..mapa.alto() {
+                assert_eq!(mapa.ver_célula(i, j)?, false);
+            }
+        }
+
+        Ok(())
+    }
+
+}
